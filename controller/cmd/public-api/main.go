@@ -49,6 +49,7 @@ func main() {
 		k8sClient,
 		nil,
 		restrictToNamespace,
+		k8s.Daemonset,
 		k8s.Deploy,
 		k8s.Pod,
 		k8s.RC,
