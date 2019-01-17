@@ -427,7 +427,6 @@ func (hc *HealthChecker) allCategories() []category {
 			checkers: []checker{
 				{
 					description: "can determine the latest version",
-					fatal:       true,
 					check: func() (err error) {
 						if hc.VersionOverride != "" {
 							hc.latestVersion = hc.VersionOverride

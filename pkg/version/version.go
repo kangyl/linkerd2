@@ -13,6 +13,11 @@ import (
 	pb "github.com/linkerd/linkerd2/controller/gen/public"
 )
 
+type version struct {
+	channel  string
+	revision string
+}
+
 // Version is updated automatically as part of the build process
 //
 // DO NOT EDIT
@@ -35,6 +40,10 @@ func init() {
 			Version = override
 		}
 	}
+}
+
+func (v version) String() string {
+	return fmt.Sprintf("%s-%s", v.channel, v.revision)
 }
 
 // CheckClientVersion validates whether the Linkerd Public API client's version
@@ -108,43 +117,44 @@ func GetLatestVersion(uuid string, source string) (string, error) {
 		return "", err
 	}
 
-	channel := parseChannel(Version)
-	if channel == "" {
-		return "", fmt.Errorf("Unsupported version format: %s", Version)
+	parsed, err := parseVersion(Version)
+	if err != nil {
+		return "", err
 	}
 
-	version, ok := versionRsp[channel]
+	version, ok := versionRsp[parsed.channel]
 	if !ok {
-		return "", fmt.Errorf("Unsupported version channel: %s", channel)
+		return "", fmt.Errorf("unsupported version channel: %s", parsed.channel)
 	}
 
 	return version, nil
 }
 
-func parseVersion(version string) string {
-	if parts := strings.SplitN(version, "-", 2); len(parts) == 2 {
-		return parts[1]
+func parseVersion(v string) (version, error) {
+	if parts := strings.SplitN(v, "-", 2); len(parts) == 2 {
+		return version{
+			channel:  parts[0],
+			revision: parts[1],
+		}, nil
 	}
-	return version
-}
-
-func parseChannel(version string) string {
-	if parts := strings.SplitN(version, "-", 2); len(parts) == 2 {
-		return parts[0]
-	}
-	return ""
+	return version{}, fmt.Errorf("unsupported version format: %s", v)
 }
 
 func versionMismatchError(expectedVersion, actualVersion string) error {
-	channel := parseChannel(expectedVersion)
-	expectedVersionStr := parseVersion(expectedVersion)
-	actualVersionStr := parseVersion(actualVersion)
-
-	if channel != "" {
-		return fmt.Errorf("is running version %s but the latest %s version is %s",
-			actualVersionStr, channel, expectedVersionStr)
+	actual, err := parseVersion(actualVersion)
+	if err != nil {
+		return fmt.Errorf("failed to parse actual version: %s", err)
+	}
+	expected, err := parseVersion(expectedVersion)
+	if err != nil {
+		return fmt.Errorf("failed to parse expected version: %s", err)
 	}
 
-	return fmt.Errorf("is running version %s but the latest version is %s",
-		actualVersionStr, expectedVersionStr)
+	if actual.channel != expected.channel {
+		return fmt.Errorf("mismatched channels: running %s but retrieved %s",
+			actual, expected)
+	}
+
+	return fmt.Errorf("is running version %s but the latest %s version is %s",
+		actual.revision, actual.channel, expected.revision)
 }
